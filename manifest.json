@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "AI Dev Installer",
+  "version": "1.0.0",
+  "description": "Install any GitHub/PyPI/npm package directly into VS Code or Cursor with one click",
+  "permissions": ["tabs", "activeTab", "storage", "notifications", "scripting", "clipboardWrite"],
+  "host_permissions": [
+    "http://localhost:9876/*",
+    "https://github.com/*",
+    "https://pypi.org/*",
+    "https://www.npmjs.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*/*", "https://pypi.org/project/*", "https://www.npmjs.com/package/*"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
