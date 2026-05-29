@@ -1,235 +1,201 @@
 const BRIDGE = 'http://localhost:9876';
 
-// ── Package detection from URL ──────────────────────────────────────────────
-
-function detectPackage(url) {
+// ── Package detection ────────────────────────────────────────────────────────
+function detect(url) {
   try {
     const u = new URL(url);
-    const host = u.hostname;
-    const parts = u.pathname.split('/').filter(Boolean);
+    const h = u.hostname;
+    const p = u.pathname.split('/').filter(Boolean);
 
-    if (host === 'github.com' && parts.length >= 2) {
-      const repo = `${parts[0]}/${parts[1]}`;
-      const pkgName = parts[1];
+    if (h === 'github.com' && p.length >= 2) {
+      const repo = `${p[0]}/${p[1]}`;
+      const clean = url.split('?')[0].split('#')[0];
       return {
-        type: 'github', badge: 'badge-github',
+        type:'github', badge:'bg', badgeText:'GitHub',
         name: repo,
-        cmd: `pip install git+${url.split('?')[0]}`,
-        aiPrompt: `Install the GitHub repo ${url} into my project. Figure out if it's pip, npm, or cargo and run the right install command. Then open the README and summarize what it does.`,
+        cmd: `pip install git+${clean}`,
+        aiPrompt:`Install ${clean} — detect pip/npm/cargo and run the right command. Add to requirements/package.json. Show a usage example.`,
         url
       };
     }
-    if (host === 'pypi.org' && parts[0] === 'project' && parts[1]) {
+    if (h === 'pypi.org' && p[0] === 'project' && p[1]) {
       return {
-        type: 'pip', badge: 'badge-pip',
-        name: parts[1],
-        cmd: `pip install ${parts[1]}`,
-        aiPrompt: `Run: pip install ${parts[1]}\nThen check requirements.txt and add it there. Show me a quick usage example.`,
+        type:'pip', badge:'bp', badgeText:'pip',
+        name: p[1],
+        cmd: `pip install ${p[1]}`,
+        aiPrompt:`pip install ${p[1]} — add to requirements.txt and show a quick usage snippet.`,
         url
       };
     }
-    if ((host === 'npmjs.com' || host === 'www.npmjs.com') && parts[0] === 'package' && parts[1]) {
+    if ((h === 'npmjs.com'||h==='www.npmjs.com') && p[0]==='package' && p[1]) {
       return {
-        type: 'npm', badge: 'badge-npm',
-        name: parts[1],
-        cmd: `npm install ${parts[1]}`,
-        aiPrompt: `Run: npm install ${parts[1]}\nAdd it to package.json and show a quick usage snippet.`,
+        type:'npm', badge:'bn', badgeText:'npm',
+        name: p[1],
+        cmd: `npm install ${p[1]}`,
+        aiPrompt:`npm install ${p[1]} — add to package.json and show usage.`,
         url
       };
     }
-    // Generic URL — try to guess package name from last path segment
-    const last = parts[parts.length - 1] || host;
     return {
-      type: 'url', badge: 'badge-url',
-      name: last,
-      cmd: `# ${url}`,
-      aiPrompt: `Open this URL and help me install it: ${url}`,
-      url
+      type:'url', badge:'bu', badgeText:'URL',
+      name: h, cmd:`# ${url}`,
+      aiPrompt:`Help me use: ${url}`, url
     };
   } catch {
-    return { type: 'url', badge: 'badge-url', name: 'Unknown', cmd: '# no URL detected', aiPrompt: '', url };
+    return {type:'url',badge:'bu',badgeText:'URL',name:'—',cmd:'—',aiPrompt:'',url:''};
   }
 }
 
-// ── Bridge status ────────────────────────────────────────────────────────────
-
-async function checkBridge() {
-  try {
-    const r = await fetch(`${BRIDGE}/status`, { signal: AbortSignal.timeout(2000) });
-    const data = await r.json();
-    return data;
-  } catch {
-    return null;
-  }
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function setStatus(ico, txt) {
+  document.getElementById('status-ico').textContent = ico;
+  document.getElementById('status-txt').textContent = txt;
+}
+function setBridge(ok) {
+  const dot = document.getElementById('bdot');
+  const lbl = document.getElementById('blbl');
+  if (ok) { dot.className='dot g'; lbl.textContent='Bridge online — VS Code ready'; }
+  else     { dot.className='dot r'; lbl.textContent='Bridge offline — clipboard fallback'; }
+}
+async function clip(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch { return false; }
 }
 
-function setBridgeStatus(ok) {
-  const dot   = document.getElementById('bridge-dot');
-  const label = document.getElementById('bridge-label');
-  if (ok === null) {
-    dot.style.background = '#f85149';
-    label.textContent = 'Bridge offline — clipboard fallback active';
-  } else {
-    dot.style.background = '#3fb950';
-    label.textContent = `Bridge online · editor: ${ok.editor || 'auto'}`;
-  }
+// ── Bridge calls ─────────────────────────────────────────────────────────────
+async function bridgeInstall(cmd, project) {
+  const r = await fetch(`${BRIDGE}/install`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({command:cmd, project}),
+    signal: AbortSignal.timeout(4000)
+  });
+  return r.json();
+}
+async function bridgeOpenVSCode(project) {
+  const r = await fetch(`${BRIDGE}/open-editor`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({editor:'vscode', project}),
+    signal: AbortSignal.timeout(4000)
+  });
+  return r.json();
 }
 
-// ── Editor preference ────────────────────────────────────────────────────────
-
-let preferredEditor = 'cursor';
-
-function setEditor(ed) {
-  preferredEditor = ed;
-  document.getElementById('btn-vscode').classList.toggle('active', ed === 'vscode');
-  document.getElementById('btn-cursor').classList.toggle('active', ed === 'cursor');
-  chrome.storage.local.set({ preferredEditor: ed });
-}
-
-// ── Status bar helper ────────────────────────────────────────────────────────
-
-function status(msg, timeout = 0) {
-  document.getElementById('status-text').textContent = msg;
-  if (timeout) setTimeout(() => status('Ready'), timeout);
-}
-
-async function copyToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// ── Main ────────────────────────────────────────────────────────────────────
-
+// ── Main ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // Load saved editor preference
-  const stored = await chrome.storage.local.get(['preferredEditor', 'projects']);
-  if (stored.preferredEditor) setEditor(stored.preferredEditor);
-  else setEditor('cursor');
 
-  // Populate projects from storage
-  const projects = stored.projects || [];
-  const sel = document.getElementById('project-select');
+  // 1. Get current tab URL
+  const [tab] = await chrome.tabs.query({active:true,currentWindow:true});
+  const pkg = detect(tab?.url || '');
+
+  // 2. Populate UI
+  const badgeEl = document.getElementById('pkg-badge');
+  badgeEl.className = `badge ${pkg.badge}`;
+  badgeEl.textContent = pkg.badgeText;
+  document.getElementById('pkg-name').textContent  = pkg.name;
+  document.getElementById('cmd-text').textContent  = pkg.cmd;
+
+  // 3. Check bridge
+  let bridgeOk = false;
+  try {
+    const s = await fetch(`${BRIDGE}/status`,{signal:AbortSignal.timeout(1500)});
+    bridgeOk = s.ok;
+  } catch {}
+  setBridge(bridgeOk);
+
+  // 4. Load saved projects
+  const { projects=[], lastProject='' } = await chrome.storage.local.get(['projects','lastProject']);
+  const sel = document.getElementById('proj-sel');
   projects.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.path; opt.textContent = p.name;
-    sel.insertBefore(opt, sel.querySelector('[value="custom"]'));
+    const o = document.createElement('option');
+    o.value=p.path; o.textContent=p.name;
+    sel.insertBefore(o, sel.querySelector('[value="__add__"]'));
   });
+  if (lastProject) sel.value = lastProject;
 
-  // Check bridge
-  const bridge = await checkBridge();
-  setBridgeStatus(bridge);
-
-  // Get current tab URL
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const pkg = detectPackage(tab?.url || '');
-
-  // Update UI
-  document.getElementById('pkg-badge').className = `pkg-type-badge ${pkg.badge}`;
-  document.getElementById('pkg-badge').textContent = pkg.type;
-  document.getElementById('pkg-name').textContent = pkg.name;
-  document.getElementById('install-cmd').textContent = pkg.cmd;
-
-  // Copy command button
-  document.getElementById('copy-cmd').addEventListener('click', async () => {
-    await copyToClipboard(pkg.cmd);
-    document.getElementById('copy-cmd').textContent = '✓';
-    setTimeout(() => { document.getElementById('copy-cmd').textContent = '⎘'; }, 1500);
-  });
-
-  // Editor buttons
-  document.getElementById('btn-vscode').addEventListener('click', () => setEditor('vscode'));
-  document.getElementById('btn-cursor').addEventListener('click', () => setEditor('cursor'));
-
-  // Project select — handle "Add project"
   sel.addEventListener('change', async () => {
-    if (sel.value === 'custom') {
-      const path = prompt('Enter full project path:');
-      const name = prompt('Project display name:');
+    if (sel.value === '__add__') {
+      const path = prompt('Full project path:');
+      const name = prompt('Display name:');
       if (path && name) {
-        const existing = (await chrome.storage.local.get('projects')).projects || [];
-        existing.push({ path, name });
-        await chrome.storage.local.set({ projects: existing });
-        const opt = document.createElement('option');
-        opt.value = path; opt.textContent = name;
-        sel.insertBefore(opt, sel.querySelector('[value="custom"]'));
-        sel.value = path;
-      } else {
-        sel.value = '';
-      }
+        const all = (await chrome.storage.local.get('projects')).projects || [];
+        all.push({path,name});
+        await chrome.storage.local.set({projects:all});
+        const o=document.createElement('option');
+        o.value=path;o.textContent=name;
+        sel.insertBefore(o,sel.querySelector('[value="__add__"]'));
+        sel.value=path;
+      } else sel.value='';
     }
+    if (sel.value) chrome.storage.local.set({lastProject:sel.value});
   });
 
-  // ── Install button ──────────────────────────────────────────────────────
-  document.getElementById('btn-install').addEventListener('click', async () => {
+  // ── Copy command ──────────────────────────────────────────────────────────
+  document.getElementById('copy-cmd').addEventListener('click', async () => {
+    await clip(pkg.cmd);
+    document.getElementById('copy-cmd').textContent='✓';
+    setTimeout(()=>{document.getElementById('copy-cmd').textContent='⎘';},1500);
+  });
+
+  // ── ONE-CLICK: Install + Open VS Code ─────────────────────────────────────
+  document.getElementById('btn-one-click').addEventListener('click', async () => {
     const project = sel.value;
-    if (!project) { status('⚠️ Select a target project first', 3000); return; }
+    const btn = document.getElementById('btn-one-click');
+    btn.textContent='⏳ Working…';
+    btn.disabled=true;
 
-    status('📦 Sending to bridge server…');
-
-    try {
-      const r = await fetch(`${BRIDGE}/install`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: pkg.cmd, project, url: pkg.url }),
-        signal: AbortSignal.timeout(5000)
-      });
-      const data = await r.json();
-      if (data.ok) {
-        status(`✅ Running: ${pkg.cmd}`, 4000);
-      } else {
-        throw new Error(data.error);
+    if (bridgeOk && pkg.cmd !== '—') {
+      // Step 1: run install via bridge
+      try {
+        setStatus('🔧','Installing…');
+        if (!pkg.cmd.startsWith('#')) await bridgeInstall(pkg.cmd, project);
+        setStatus('📂','Opening VS Code…');
+        await bridgeOpenVSCode(project);
+        setStatus('✅',`Done — ${pkg.name} installing in VS Code`);
+        btn.textContent='✅ Done!';
+        btn.style.background='#238636';
+      } catch(e) {
+        setStatus('⚠️','Bridge error — using fallback');
+        await clip(pkg.cmd);
+        chrome.tabs.create({url:`vscode://file/${encodeURIComponent(project||'')}`});
+        setStatus('📋','Command copied — paste in VS Code terminal');
+        btn.textContent='📋 Copied!';
       }
-    } catch {
-      // Fallback: copy to clipboard
-      await copyToClipboard(pkg.cmd);
-      status('📋 Copied! Paste in terminal (bridge offline)', 4000);
+    } else {
+      // Fallback: clipboard + URI
+      await clip(pkg.cmd);
+      const uri = project ? `vscode://file/${encodeURIComponent(project)}` : 'vscode://';
+      chrome.tabs.create({url: uri});
+      setStatus('📋','Copied command — paste in VS Code terminal');
+      btn.textContent='📋 Copied!';
     }
+
+    setTimeout(()=>{
+      btn.textContent='⚡ Install & Open VS Code';
+      btn.disabled=false;
+      btn.style.background='';
+    },3000);
   });
 
-  // ── Install with AI ─────────────────────────────────────────────────────
-  document.getElementById('btn-install-ai').addEventListener('click', async () => {
+  // ── Just open VS Code ─────────────────────────────────────────────────────
+  document.getElementById('btn-vscode-only').addEventListener('click', async () => {
     const project = sel.value;
-
-    try {
-      const r = await fetch(`${BRIDGE}/install-ai`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          command: pkg.cmd,
-          prompt: pkg.aiPrompt,
-          url: pkg.url,
-          project,
-          editor: preferredEditor
-        }),
-        signal: AbortSignal.timeout(5000)
-      });
-      const data = await r.json();
-      if (data.ok) {
-        status(`🤖 Opened in ${preferredEditor} with AI prompt!`, 4000);
-      } else throw new Error(data.error);
-    } catch {
-      // Fallback: copy AI prompt + open editor via URI
-      await copyToClipboard(pkg.aiPrompt);
-      const uri = preferredEditor === 'cursor'
-        ? (project ? `cursor://file/${encodeURIComponent(project)}` : 'cursor://')
-        : (project ? `vscode://file/${encodeURIComponent(project)}` : 'vscode://');
-      chrome.tabs.create({ url: uri });
-      status('📋 AI prompt copied — paste it in the editor chat', 5000);
+    setStatus('📂','Opening VS Code…');
+    if (bridgeOk) {
+      try { await bridgeOpenVSCode(project); setStatus('✅','VS Code opened!'); return; }
+      catch {}
     }
+    const uri = project ? `vscode://file/${encodeURIComponent(project)}` : 'vscode://';
+    chrome.tabs.create({url: uri});
+    setStatus('✅','VS Code opened via URI');
   });
 
-  // ── Copy AI prompt ──────────────────────────────────────────────────────
-  document.getElementById('btn-copy-prompt').addEventListener('click', async () => {
-    await copyToClipboard(pkg.aiPrompt);
-    status('📋 AI prompt copied to clipboard!', 3000);
+  // ── Copy all ──────────────────────────────────────────────────────────────
+  document.getElementById('btn-copy-all').addEventListener('click', async () => {
+    const full = `${pkg.cmd}\n\n# AI prompt:\n# ${pkg.aiPrompt}`;
+    await clip(full);
+    setStatus('📋','Install command + AI prompt copied!');
+    setTimeout(()=>setStatus('🟡','Ready'),3000);
   });
 
-  // Settings link
-  document.getElementById('open-settings').addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-  });
+  setStatus('🟡','Ready');
 });

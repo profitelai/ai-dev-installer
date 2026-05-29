@@ -10,10 +10,17 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 PORT = 9876
 
-# Detect available editors
+# Detect available editors — also check common Mac install paths
+def _find_editor(names):
+    for n in names:
+        p = shutil.which(n)
+        if p: return p
+    return None
+
 EDITORS = {
-    'cursor': shutil.which('cursor'),
-    'vscode': shutil.which('code'),
+    'vscode':  _find_editor(['code', '/usr/local/bin/code', '/opt/homebrew/bin/code']),
+    'cursor':  _find_editor(['cursor', '/usr/local/bin/cursor',
+                             '/Applications/Cursor.app/Contents/MacOS/Cursor']),
 }
 
 # ── Install job state ────────────────────────────────────────────────────────

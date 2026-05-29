@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "AI Dev Installer",
-  "version": "1.0.0",
-  "description": "Install any GitHub/PyPI/npm package directly into VS Code or Cursor with one click",
-  "permissions": ["tabs", "activeTab", "storage", "notifications", "scripting", "clipboardWrite"],
+  "version": "1.1.0",
+  "description": "One-click: install any GitHub/PyPI/npm package into VS Code with AI",
+  "permissions": ["tabs", "activeTab", "storage", "scripting", "clipboardWrite"],
   "host_permissions": [
     "http://localhost:9876/*",
     "https://github.com/*",
@@ -15,13 +15,29 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://github.com/*/*", "https://pypi.org/project/*", "https://www.npmjs.com/package/*"],
+      "matches": [
+        "https://github.com/*/*",
+        "https://pypi.org/project/*",
+        "https://www.npmjs.com/package/*"
+      ],
       "js": ["content.js"],
-      "css": ["content.css"]
+      "css": ["content.css"],
+      "run_at": "document_idle"
     }
   ],
+  "commands": {
+    "install-vscode": {
+      "suggested_key": { "default": "Ctrl+Shift+V", "mac": "Command+Shift+V" },
+      "description": "Install package → VS Code"
+    },
+    "copy-install-cmd": {
+      "suggested_key": { "default": "Ctrl+Shift+C", "mac": "Command+Shift+C" },
+      "description": "Copy install command to clipboard"
+    }
+  },
   "action": {
     "default_popup": "popup.html",
+    "default_title": "AI Dev Installer — click to install",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

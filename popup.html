@@ -2,269 +2,185 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>AI Dev Installer</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      width: 380px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0d1117;
-      color: #e6edf3;
-      font-size: 13px;
-    }
-    .header {
-      background: linear-gradient(135deg, #1f6feb 0%, #6e40c9 100%);
-      padding: 14px 16px 12px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .header-icon { font-size: 22px; }
-    .header-title { font-size: 15px; font-weight: 700; }
-    .header-sub { font-size: 11px; opacity: .75; margin-top: 2px; }
-
-    .bridge-status {
-      padding: 6px 14px;
-      font-size: 11px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: #161b22;
-      border-bottom: 1px solid #30363d;
-    }
-    .dot { width: 7px; height: 7px; border-radius: 50%; }
-    .dot.green { background: #3fb950; }
-    .dot.red   { background: #f85149; }
-    .dot.yellow{ background: #d29922; }
-
-    .package-card {
-      margin: 12px;
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .package-header {
-      background: #21262d;
-      padding: 10px 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .pkg-type-badge {
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .5px;
-    }
-    .badge-pip   { background: #3d62b0; color: #a5c8ff; }
-    .badge-npm   { background: #2d4a22; color: #7ee787; }
-    .badge-github{ background: #3d2b63; color: #c9b1ff; }
-    .badge-url   { background: #3d2b2b; color: #ffa198; }
-
-    .pkg-name {
-      font-size: 14px;
-      font-weight: 700;
-      color: #e6edf3;
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      width:320px;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      background:#0d1117;color:#e6edf3;font-size:13px;
     }
 
-    .command-row {
-      padding: 10px 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    /* ── Header ── */
+    .hdr{
+      background:linear-gradient(135deg,#1f6feb,#6e40c9);
+      padding:12px 14px;
+      display:flex;align-items:center;gap:10px;
     }
-    .command-box {
-      flex: 1;
-      background: #0d1117;
-      border: 1px solid #30363d;
-      border-radius: 5px;
-      padding: 7px 10px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 12px;
-      color: #79c0ff;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .copy-btn {
-      background: none;
-      border: 1px solid #30363d;
-      border-radius: 5px;
-      color: #8b949e;
-      cursor: pointer;
-      padding: 6px 8px;
-      font-size: 14px;
-    }
-    .copy-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+    .hdr-ico{font-size:20px}
+    .hdr-t{font-size:14px;font-weight:700}
+    .hdr-s{font-size:10px;opacity:.75;margin-top:1px}
 
-    .section { padding: 0 12px 8px; }
-    .section-label {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .8px;
-      color: #8b949e;
-      margin-bottom: 6px;
+    /* ── Bridge pill ── */
+    .pill{
+      display:flex;align-items:center;gap:5px;
+      padding:5px 14px;
+      background:#161b22;border-bottom:1px solid #21262d;
+      font-size:10px;color:#8b949e;
+    }
+    .dot{width:6px;height:6px;border-radius:50%}
+    .g{background:#3fb950}.r{background:#f85149}.y{background:#d29922}
+
+    /* ── Package card ── */
+    .pkg{margin:10px;background:#161b22;border:1px solid #30363d;border-radius:8px}
+    .pkg-top{
+      padding:10px 12px;
+      display:flex;align-items:center;gap:8px;
+    }
+    .badge{
+      padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;
+      text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;
+    }
+    .bp{background:#1d3d6e;color:#79c0ff}
+    .bn{background:#1a3622;color:#56d364}
+    .bg{background:#2d1f5e;color:#c9b1ff}
+    .bu{background:#3d1f1f;color:#ffa198}
+    .pkg-name{font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cmd{
+      margin:0 12px;
+      background:#0d1117;border:1px solid #21262d;border-radius:5px;
+      padding:6px 10px;
+      font-family:'SF Mono','Fira Code',monospace;font-size:11px;
+      color:#79c0ff;display:flex;align-items:center;justify-content:space-between;gap:6px;
+    }
+    .cmd-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+    .copy-ico{cursor:pointer;color:#8b949e;font-size:13px;flex-shrink:0;border:none;background:none}
+    .copy-ico:hover{color:#58a6ff}
+
+    /* ── Project select ── */
+    .sect{padding:8px 10px 4px}
+    .sect-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:#8b949e;margin-bottom:5px}
+    select{
+      width:100%;background:#161b22;border:1px solid #30363d;border-radius:5px;
+      color:#e6edf3;padding:7px 9px;font-size:12px;cursor:pointer;
+    }
+    select:focus{outline:none;border-color:#58a6ff}
+
+    /* ── BIG ONE-CLICK BUTTONS ── */
+    .actions{padding:8px 10px 4px;display:flex;flex-direction:column;gap:6px}
+    .btn{
+      width:100%;padding:12px;border-radius:7px;border:none;cursor:pointer;
+      font-size:13px;font-weight:700;
+      display:flex;align-items:center;justify-content:center;gap:8px;
+      transition:transform .1s,opacity .15s;
+      letter-spacing:.1px;
+    }
+    .btn:hover{opacity:.88}
+    .btn:active{transform:scale(.97)}
+
+    /* The main one-click button — big and unmissable */
+    .btn-main{
+      background:linear-gradient(135deg,#1f6feb,#6e40c9);
+      color:#fff;font-size:15px;padding:15px;
+      box-shadow:0 2px 12px rgba(31,111,235,.35);
+    }
+    .btn-vscode{background:#007acc;color:#fff}
+    .btn-copy {background:#21262d;color:#e6edf3;border:1px solid #30363d;font-size:12px;padding:8px}
+
+    /* ── Keyboard shortcuts hint ── */
+    .shortcuts{
+      padding:4px 10px 2px;
+      display:flex;gap:6px;flex-wrap:wrap;
+    }
+    .kbd-hint{
+      flex:1;background:#161b22;border:1px solid #21262d;border-radius:5px;
+      padding:5px 8px;font-size:10px;color:#8b949e;text-align:center;
+    }
+    kbd{
+      background:#21262d;border:1px solid #444;border-radius:3px;
+      padding:1px 4px;font-size:9px;font-family:monospace;color:#e6edf3;
     }
 
-    .project-select {
-      width: 100%;
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 6px;
-      color: #e6edf3;
-      padding: 7px 10px;
-      font-size: 12px;
-      cursor: pointer;
+    /* ── Status bar ── */
+    .status{
+      background:#161b22;border-top:1px solid #21262d;
+      padding:6px 12px;font-size:11px;color:#8b949e;
+      display:flex;align-items:center;gap:6px;min-height:28px;
     }
-    .project-select:focus { outline: none; border-color: #58a6ff; }
+    #status-ico{font-size:13px}
+    #status-txt{flex:1}
 
-    .actions { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 7px; }
-
-    .btn {
-      width: 100%;
-      padding: 10px 14px;
-      border-radius: 7px;
-      border: none;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: opacity .15s, transform .1s;
-    }
-    .btn:hover { opacity: .88; }
-    .btn:active { transform: scale(.98); }
-
-    .btn-primary   { background: #238636; color: #fff; }
-    .btn-ai        { background: linear-gradient(135deg, #1f6feb, #6e40c9); color: #fff; }
-    .btn-secondary { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
-
-    .divider {
-      height: 1px;
-      background: #21262d;
-      margin: 2px 12px 8px;
-    }
-
-    .editor-row {
-      display: flex;
-      gap: 6px;
-      padding: 0 12px 8px;
-    }
-    .editor-btn {
-      flex: 1;
-      padding: 7px;
-      background: #21262d;
-      border: 1px solid #30363d;
-      border-radius: 6px;
-      color: #8b949e;
-      cursor: pointer;
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-    }
-    .editor-btn:hover { border-color: #58a6ff; color: #58a6ff; }
-    .editor-btn.active { border-color: #3fb950; color: #3fb950; background: #0f2b14; }
-
-    .status-bar {
-      background: #161b22;
-      border-top: 1px solid #21262d;
-      padding: 6px 14px;
-      font-size: 11px;
-      color: #8b949e;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      min-height: 30px;
-    }
-    #status-text { flex: 1; }
-
-    .settings-link {
-      color: #58a6ff;
-      cursor: pointer;
-      text-decoration: none;
-      font-size: 11px;
-    }
+    .spin{display:inline-block;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
   </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="header-icon">⚡</div>
+<div class="hdr">
+  <div class="hdr-ico">⚡</div>
   <div>
-    <div class="header-title">AI Dev Installer</div>
-    <div class="header-sub">VS Code · Cursor · Local bridge</div>
+    <div class="hdr-t">AI Dev Installer</div>
+    <div class="hdr-s">VS Code · One click install</div>
   </div>
 </div>
 
-<div class="bridge-status">
-  <div class="dot" id="bridge-dot" style="background:#d29922"></div>
-  <span id="bridge-label">Checking bridge server…</span>
+<div class="pill">
+  <div class="dot y" id="bdot"></div>
+  <span id="blbl">Checking bridge…</span>
 </div>
 
-<div class="package-card">
-  <div class="package-header">
-    <span class="pkg-type-badge badge-pip" id="pkg-badge">···</span>
-    <span class="pkg-name" id="pkg-name">Detecting package…</span>
-  </div>
-  <div class="command-row">
-    <div class="command-box" id="install-cmd">—</div>
-    <button class="copy-btn" id="copy-cmd" title="Copy command">⎘</button>
+<!-- Detected package -->
+<div class="pkg">
+  <div class="pkg-top">
+    <span class="badge bp" id="pkg-badge">···</span>
+    <span class="pkg-name" id="pkg-name">Detecting…</span>
   </div>
 </div>
+<div class="cmd">
+  <span class="cmd-text" id="cmd-text">—</span>
+  <button class="copy-ico" id="copy-cmd" title="Copy">⎘</button>
+</div>
 
-<div class="section">
-  <div class="section-label">Target project</div>
-  <select class="project-select" id="project-select">
-    <option value="">— select project folder —</option>
-    <option value="/Users/danimaster/Downloads/ai-avatar-projects/SadTalker">SadTalker</option>
+<!-- Project target -->
+<div class="sect">
+  <div class="sect-lbl">Install into project</div>
+  <select id="proj-sel">
+    <option value="">— pick a project —</option>
     <option value="/Users/danimaster/Downloads/ai-avatar-projects/deepface-studio">DeepFace Studio</option>
+    <option value="/Users/danimaster/Downloads/ai-avatar-projects/SadTalker">SadTalker</option>
     <option value="/Users/danimaster/photo-editor">photo-editor</option>
-    <option value="custom">＋ Add project…</option>
+    <option value="__add__">＋ Add project…</option>
   </select>
 </div>
 
-<div class="section" style="margin-top:4px;">
-  <div class="section-label">Open in editor</div>
-</div>
-<div class="editor-row">
-  <button class="editor-btn" id="btn-vscode" title="VS Code">
-    <span>⬛</span> VS Code
-  </button>
-  <button class="editor-btn" id="btn-cursor" title="Cursor">
-    <span>🔵</span> Cursor
-  </button>
-</div>
-
+<!-- Actions -->
 <div class="actions">
-  <button class="btn btn-primary" id="btn-install">
-    📦 Install package
+
+  <!-- THE big one-click button -->
+  <button class="btn btn-main" id="btn-one-click">
+    ⚡ Install &amp; Open VS Code
   </button>
-  <button class="btn btn-ai" id="btn-install-ai">
-    🤖 Install with AI  →  Cursor/VS Code
+
+  <button class="btn btn-vscode" id="btn-vscode-only">
+    <span>⬛</span> Just open VS Code
   </button>
-  <button class="btn btn-secondary" id="btn-copy-prompt">
-    📋 Copy AI prompt
+
+  <button class="btn btn-copy" id="btn-copy-all">
+    📋 Copy install command
   </button>
+
 </div>
 
-<div class="divider"></div>
+<!-- Keyboard shortcuts hint -->
+<div class="shortcuts">
+  <div class="kbd-hint"><kbd>⌘⇧V</kbd> Install → VS Code</div>
+  <div class="kbd-hint"><kbd>⌘⇧C</kbd> Copy command</div>
+</div>
 
-<div class="status-bar">
-  <span id="status-text">Ready</span>
-  <a class="settings-link" id="open-settings">⚙ Settings</a>
+<!-- Status -->
+<div class="status">
+  <span id="status-ico">🟡</span>
+  <span id="status-txt">Ready</span>
 </div>
 
 <script src="popup.js"></script>
