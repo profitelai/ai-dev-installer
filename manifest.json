@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AI Dev Installer",
+  "name": "GitHub Installer",
   "version": "1.2.0",
-  "description": "One-click: smart install from README — detects brew/pip/npm/cargo automatically",
+  "description": "Install any GitHub repository into VS Code in one click — auto-detects brew, pip, npm, cargo and more",
   "permissions": ["tabs", "activeTab", "storage", "scripting", "clipboardWrite"],
   "host_permissions": [
     "http://localhost:9876/*",
