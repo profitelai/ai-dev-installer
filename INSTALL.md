@@ -9,34 +9,42 @@
 3. Click **Load unpacked**
 4. Select this folder:
    ```
-   /Users/danimaster/Downloads/ai-avatar-projects/chrome-extension
+   /Users/danimaster/Desktop/ai-dev-installer
    ```
 5. The ⚡ icon appears in your toolbar
 
 ### Step 2 — Start the bridge server
 
-The bridge lets the extension run install commands and open your editor.
+The bridge runs on port 9876 and handles install commands, README detection, and opening VS Code.
 
 ```bash
-bash /Users/danimaster/Downloads/ai-avatar-projects/chrome-extension/bridge/start.sh
+python3 /Users/danimaster/Desktop/ai-dev-installer/bridge/server.py
 ```
 
 Keep this terminal open. You'll see:
 ```
-AI Dev Installer bridge — listening on http://localhost:9876
-  cursor: /usr/local/bin/cursor   (or path)
-  vscode: /usr/local/bin/code     (or path)
+AI Dev Installer bridge — http://localhost:9876
+  pip:    pip3
+  vscode: /Applications/Visual Studio Code.app/...
 ```
 
 ### Step 3 — Use it
 
-1. Go to any GitHub repo, e.g. https://github.com/serengil/deepface
-2. Click the ⚡ button in the toolbar (or the floating button on the page)
-3. Select a **target project** from the dropdown
-4. Click one of:
-   - **📦 Install package** — runs `pip install …` in your project
-   - **🤖 Install with AI** — opens Cursor/VS Code + copies an AI prompt
-   - **📋 Copy AI prompt** — copies the prompt to clipboard
+1. Go to any GitHub repo, PyPI package, or npm package page
+2. Click the ⚡ icon in the Chrome toolbar
+3. The extension reads the README and auto-detects the real install command
+   - Shows `brew install`, `pip3 install`, `npm install`, `cargo install`, etc. — whatever the project actually uses
+   - Green **"from README"** badge confirms it was detected, not guessed
+4. Pick a target project folder (optional) or leave blank to install globally
+5. Click **⚡ Install & Open VS Code** — a Terminal window opens showing the live install
+
+### How smart detection works
+
+- Fetches the GitHub README via the GitHub API
+- Searches code blocks for install commands in priority order:
+  `brew` → `pipx` → `pip` → `npm` → `yarn` → `cargo` → `go` → `gem` → `curl` → `apt`
+- If multiple methods are found, shows a dropdown to pick one
+- Falls back to `pip3 install git+<url>` only when nothing is found
 
 ### Pinning the extension
 

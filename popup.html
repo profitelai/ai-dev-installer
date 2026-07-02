@@ -138,17 +138,18 @@
 </div>
 <div class="cmd">
   <span class="cmd-text" id="cmd-text">—</span>
+  <span id="detect-badge" style="display:none;font-size:9px;background:#1a3622;color:#56d364;padding:1px 5px;border-radius:8px;flex-shrink:0;white-space:nowrap"></span>
   <button class="copy-ico" id="copy-cmd" title="Copy">⎘</button>
 </div>
+
+<!-- populated by JS when multiple install methods are found -->
+<div id="cmd-picker" style="display:none"></div>
 
 <!-- Project target -->
 <div class="sect">
   <div class="sect-lbl">Install into project</div>
   <select id="proj-sel">
-    <option value="">— pick a project —</option>
-    <option value="/Users/danimaster/Downloads/ai-avatar-projects/deepface-studio">DeepFace Studio</option>
-    <option value="/Users/danimaster/Downloads/ai-avatar-projects/SadTalker">SadTalker</option>
-    <option value="/Users/danimaster/photo-editor">photo-editor</option>
+    <option value="">— no project (install globally) —</option>
     <option value="__add__">＋ Add project…</option>
   </select>
 </div>

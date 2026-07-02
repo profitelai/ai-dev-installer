@@ -1,55 +1,187 @@
 """
 AI Dev Installer — Local bridge server
-Receives install requests from the Chrome extension and runs them in VS Code / Cursor.
+Receives install requests from the Chrome extension and runs them in a
+visible Terminal window + opens VS Code / Cursor.
 
-Run:  python server.py
+Run:  python3 server.py
 Port: 9876
 """
-import json, os, subprocess, sys, shutil, threading, time
+import base64, json, os, re, subprocess, shutil, threading, time, urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 PORT = 9876
 
-# Detect available editors — also check common Mac install paths
-def _find_editor(names):
-    for n in names:
-        p = shutil.which(n)
-        if p: return p
+# ── Editor detection ─────────────────────────────────────────────────────────
+def _find_editor(candidates):
+    for c in candidates:
+        if os.path.isfile(c) and os.access(c, os.X_OK):
+            return c
+        p = shutil.which(c)
+        if p:
+            return p
     return None
 
 EDITORS = {
-    'vscode':  _find_editor([
-        'code',
+    'vscode': _find_editor([
+        '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
         '/usr/local/bin/code',
         '/opt/homebrew/bin/code',
-        '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+        'code',
     ]),
-    'cursor':  _find_editor([
-        'cursor',
-        '/usr/local/bin/cursor',
-        '/Applications/Cursor.app/Contents/MacOS/Cursor',
+    'cursor': _find_editor([
         '/Applications/Cursor.app/Contents/Resources/app/bin/cursor',
+        '/Applications/Cursor.app/Contents/MacOS/Cursor',
+        '/usr/local/bin/cursor',
+        'cursor',
     ]),
 }
 
-# ── Install job state ────────────────────────────────────────────────────────
-jobs = {}  # job_id → {status, output, error}
+# ── Python/pip detection ─────────────────────────────────────────────────────
+def _pip_cmd():
+    if shutil.which('pip3'):
+        return 'pip3'
+    py = shutil.which('python3') or shutil.which('python')
+    if py:
+        return f'"{py}" -m pip'
+    return 'pip3'
+
+PIP = _pip_cmd()
+
+def fix_pip(command):
+    if command.startswith('pip install'):
+        return command.replace('pip install', f'{PIP} install', 1)
+    return command
 
 
-def run_install(job_id, command, cwd):
+# ── Smart README detection ────────────────────────────────────────────────────
+_readme_cache = {}  # "owner/repo" → text or None
+
+# Order matters: highest-priority package managers first
+INSTALL_PRIORITY = ['brew', 'pipx', 'pip', 'npm', 'yarn', 'cargo', 'go', 'gem', 'curl', 'apt']
+
+INSTALL_PATTERNS = [
+    (r'brew\s+install(?:\s+--cask)?\s+[^\s\n]+',                  'brew'),
+    (r'pipx\s+install\s+[^\s\n]+',                                 'pipx'),
+    (r'pip3?\s+install\s+(?:-[^\s\n]+\s+)*[^\s\n]+',              'pip'),
+    (r'npm\s+install(?:\s+-[gGsS])?\s+[^\s\n]+',                  'npm'),
+    (r'yarn\s+(?:global\s+)?add\s+[^\s\n]+',                       'yarn'),
+    (r'cargo\s+install\s+[^\s\n]+',                                'cargo'),
+    (r'go\s+install\s+[^\s\n]+',                                   'go'),
+    (r'gem\s+install\s+[^\s\n]+',                                  'gem'),
+    (r'curl\s+[^\s\n]+.*?\|\s*(?:sudo\s+)?(?:bash|sh)',            'curl'),
+    (r'(?:sudo\s+)?apt(?:-get)?\s+install\s+-?y?\s*[^\s\n]+',     'apt'),
+]
+
+def fetch_readme(owner, repo):
+    key = f'{owner}/{repo}'
+    if key in _readme_cache:
+        return _readme_cache[key]
+    url = f'https://api.github.com/repos/{owner}/{repo}/readme'
+    req = urllib.request.Request(url, headers={
+        'User-Agent': 'ai-dev-installer/1.0',
+        'Accept':     'application/vnd.github.v3+json',
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read())
+            text = base64.b64decode(data['content']).decode('utf-8', errors='replace')
+            _readme_cache[key] = text
+            return text
+    except Exception:
+        _readme_cache[key] = None
+        return None
+
+def extract_install_cmds(readme_text):
+    """Return list of {cmd, type} dicts, ordered by priority."""
+    # Prefer commands inside fenced code blocks (most authoritative)
+    blocks = re.findall(r'```[a-z]*\n(.*?)```', readme_text, re.DOTALL | re.IGNORECASE)
+    search = '\n'.join(blocks) if blocks else readme_text
+
+    found, seen = [], set()
+    for pattern, ptype in INSTALL_PATTERNS:
+        for m in re.finditer(pattern, search, re.IGNORECASE):
+            cmd = m.group(0).strip()
+            if cmd not in seen:
+                seen.add(cmd)
+                found.append({'cmd': cmd, 'type': ptype})
+
+    found.sort(key=lambda x: INSTALL_PRIORITY.index(x['type'])
+               if x['type'] in INSTALL_PRIORITY else 99)
+    return found
+
+def smart_detect(github_url):
+    """
+    Given a github.com URL, fetch the README and return detected install
+    commands plus a recommended one.
+    Returns dict: {ok, commands, recommended, source}
+    """
+    # Strip trailing slashes, query strings, etc.
+    clean_url = github_url.split('?')[0].split('#')[0].rstrip('/')
+
+    # Extract owner/repo
+    match = re.search(r'github\.com/([^/]+)/([^/]+)', clean_url)
+    if not match:
+        return {'ok': False, 'commands': [], 'error': 'Not a GitHub URL'}
+    owner, repo = match.group(1), match.group(2)
+
+    readme = fetch_readme(owner, repo)
+    if not readme:
+        fallback = f'{PIP} install git+{clean_url}'
+        return {
+            'ok': True,
+            'commands': [{'cmd': fallback, 'type': 'pip'}],
+            'recommended': fallback,
+            'source': 'fallback',
+        }
+
+    cmds = extract_install_cmds(readme)
+    if not cmds:
+        fallback = f'{PIP} install git+{clean_url}'
+        cmds = [{'cmd': fallback, 'type': 'pip'}]
+        source = 'fallback'
+    else:
+        source = 'readme'
+
+    return {
+        'ok': True,
+        'commands': cmds,
+        'recommended': cmds[0]['cmd'],
+        'source': source,
+    }
+
+
+# ── Visible Terminal (macOS) ─────────────────────────────────────────────────
+def open_terminal(command, cwd):
+    safe_cwd = (cwd or os.path.expanduser('~')).replace("'", "\\'")
+    safe_cmd = command.replace('"', '\\"')
+    script = (
+        'tell application "Terminal"\n'
+        '    activate\n'
+        f'    do script "cd \'{safe_cwd}\' && {safe_cmd}"\n'
+        'end tell'
+    )
+    try:
+        subprocess.Popen(['osascript', '-e', script])
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
+# ── Job state ────────────────────────────────────────────────────────────────
+jobs = {}
+
+def run_install_bg(job_id, command, cwd):
     jobs[job_id] = {'status': 'running', 'output': [], 'error': None}
     try:
         proc = subprocess.Popen(
             command, shell=True, cwd=cwd or os.path.expanduser('~'),
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
         for line in proc.stdout:
             jobs[job_id]['output'].append(line.rstrip())
         proc.wait()
-        if proc.returncode == 0:
-            jobs[job_id]['status'] = 'done'
-        else:
-            jobs[job_id]['status'] = 'error'
+        jobs[job_id]['status'] = 'done' if proc.returncode == 0 else 'error'
+        if proc.returncode != 0:
             jobs[job_id]['error'] = f'Exit code {proc.returncode}'
     except Exception as e:
         jobs[job_id]['status'] = 'error'
@@ -59,7 +191,7 @@ def run_install(job_id, command, cwd):
 def open_editor(editor, project):
     cmd = EDITORS.get(editor) or EDITORS.get('cursor') or EDITORS.get('vscode')
     if not cmd:
-        return False, 'No editor found (install cursor or code CLI)'
+        return False, 'No editor found (install VS Code or Cursor)'
     args = [cmd]
     if project and os.path.isdir(project):
         args.append(project)
@@ -101,58 +233,59 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/status':
             editor = next((k for k, v in EDITORS.items() if v), None)
-            self.respond({'ok': True, 'editor': editor, 'editors': EDITORS})
-
+            self.respond({'ok': True, 'editor': editor, 'editors': EDITORS, 'pip': PIP})
         elif self.path.startswith('/job/'):
             job_id = self.path.split('/')[-1]
-            if job_id in jobs:
-                self.respond(jobs[job_id])
-            else:
-                self.respond({'error': 'not found'}, 404)
+            self.respond(jobs.get(job_id, {'error': 'not found'}),
+                         200 if job_id in jobs else 404)
         else:
             self.respond({'error': 'not found'}, 404)
 
     def do_POST(self):
         body = self.read_body()
 
-        if self.path == '/install':
-            command = body.get('command', '')
-            project = body.get('project', '')
+        if self.path == '/smart-detect':
+            url = body.get('url', '')
+            if not url:
+                self.respond({'ok': False, 'error': 'url required'}, 400)
+                return
+            result = smart_detect(url)
+            self.respond(result)
+
+        elif self.path == '/install':
+            command = fix_pip(body.get('command', ''))
+            project = body.get('project', '') or os.path.expanduser('~')
             if not command:
                 self.respond({'ok': False, 'error': 'command required'}, 400)
                 return
 
             job_id = f'job_{int(time.time()*1000)}'
-            # Use project venv python if available
-            venv_pip = os.path.join(project, 'venv', 'bin', 'pip')
-            if os.path.isfile(venv_pip) and command.startswith('pip install'):
-                command = command.replace('pip install', f'"{venv_pip}" install', 1)
 
-            threading.Thread(
-                target=run_install, args=(job_id, command, project), daemon=True
-            ).start()
-            self.respond({'ok': True, 'job_id': job_id})
+            if command.startswith('#'):
+                self.respond({'ok': True, 'job_id': job_id, 'terminal': False})
+                return
+
+            ok, err = open_terminal(command, project)
+            if ok:
+                jobs[job_id] = {'status': 'terminal', 'output': [], 'error': None}
+                self.respond({'ok': True, 'job_id': job_id, 'terminal': True})
+            else:
+                threading.Thread(
+                    target=run_install_bg, args=(job_id, command, project), daemon=True
+                ).start()
+                self.respond({'ok': True, 'job_id': job_id, 'terminal': False, 'warn': err})
 
         elif self.path == '/install-ai':
-            command  = body.get('command', '')
-            prompt   = body.get('prompt', '')
-            project  = body.get('project', '')
-            editor   = body.get('editor', 'cursor')
+            command = fix_pip(body.get('command', ''))
+            prompt  = body.get('prompt', '')
+            project = body.get('project', '') or os.path.expanduser('~')
+            editor  = body.get('editor', 'cursor')
 
-            # 1. Run install command
             if command and not command.startswith('#'):
-                job_id = f'job_{int(time.time()*1000)}'
-                venv_pip = os.path.join(project, 'venv', 'bin', 'pip')
-                if os.path.isfile(venv_pip) and command.startswith('pip install'):
-                    command = command.replace('pip install', f'"{venv_pip}" install', 1)
-                threading.Thread(
-                    target=run_install, args=(job_id, command, project), daemon=True
-                ).start()
+                open_terminal(command, project)
 
-            # 2. Open editor with project
             ok, err = open_editor(editor, project)
 
-            # 3. Write AI prompt to a temp file the editor can pick up
             if prompt:
                 prompt_file = os.path.expanduser('~/.ai_installer_prompt.md')
                 with open(prompt_file, 'w') as f:
@@ -171,8 +304,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    print(f'AI Dev Installer bridge — listening on http://localhost:{PORT}')
-    print(f'  cursor: {EDITORS["cursor"] or "not found"}')
+    print(f'AI Dev Installer bridge — http://localhost:{PORT}')
+    print(f'  pip:    {PIP}')
     print(f'  vscode: {EDITORS["vscode"] or "not found"}')
+    print(f'  cursor: {EDITORS["cursor"] or "not found"}')
     print('  Press Ctrl+C to stop.')
     HTTPServer(('localhost', PORT), Handler).serve_forever()

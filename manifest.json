@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AI Dev Installer",
-  "version": "1.1.0",
-  "description": "One-click: install any GitHub/PyPI/npm package into VS Code with AI",
+  "version": "1.2.0",
+  "description": "One-click: smart install from README — detects brew/pip/npm/cargo automatically",
   "permissions": ["tabs", "activeTab", "storage", "scripting", "clipboardWrite"],
   "host_permissions": [
     "http://localhost:9876/*",
