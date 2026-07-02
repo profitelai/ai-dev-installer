@@ -38,4 +38,4 @@ The `bridge/server.py` component runs entirely on your own machine at `localhost
 
 ## Contact
 
-Questions? Open an issue at https://github.com/profitelai/github-installer-chrome
+Questions? Email apps@danimaster.com or open an issue at https://github.com/profitelai/github-installer-chrome
